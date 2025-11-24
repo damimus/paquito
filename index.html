@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Puzzle 3x3 Paquito</title>
+
+  <style>
+    :root { --gap: 4px; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #eef1f6;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .puzzle {
+      position: relative;
+      width: 92vw; max-width: 420px;
+      height: 92vw; max-height: 420px;
+      background: #ddd;
+      border-radius: 12px;
+      padding: var(--gap);
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: var(--gap);
+      width: 100%; height: 100%;
+    }
+
+    .tile {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      background-size: 300% 300%;
+      background-repeat: no-repeat;
+      transition: transform 150ms ease;
+      cursor: pointer;
+    }
+
+    .empty { 
+      background: transparent; 
+      cursor: default; 
+    }
+
+    .grid.fade-out {
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .final-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+
+      font-size: 22px;
+      font-weight: bold;
+      color: #222;
+
+      opacity: 0;
+      transform: scale(0.6);
+      pointer-events: none;
+
+      transition: opacity 1s ease, transform 1s ease;
+    }
+
+    .final-text.show {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Resuelve el puzzle para encontrar tu regalo.</h2>
+
+  <div class="puzzle">
+    <div id="grid" class="grid"></div>
+    <div id="finalMessage" class="final-text"></div>
+  </div>
+
+<script>
+const ROWS = 3;
+const COLS = 3;
+const TOTAL = ROWS * COLS;
+
+const gridEl = document.getElementById("grid");
+let tiles = [];
+let tileEls = new Map();
+let backgroundImageURL = "foto.png";
+
+/* -------------------------------------
+   INICIALIZACIÓN DEL TABLERO
+------------------------------------- */
+function initBoard() {
+  tiles = [];
+  for (let i = 0; i < TOTAL; i++) {
+    tiles.push(i === TOTAL - 1 ? 0 : i + 1);
+  }
+
+  gridEl.innerHTML = "";
+  tileEls.clear();
+
+  for (let i = 0; i < TOTAL; i++) {
+    const el = document.createElement("div");
+    el.className = "tile";
+    el.dataset.index = i;
+    el.addEventListener("click", () => moveTile(i));
+    gridEl.appendChild(el);
+    tileEls.set(i, el);
+  }
+
+  shuffle();
+}
+
+/* -------------------------------------
+   SHUFFLE FISHER-YATES
+------------------------------------- */
+function shuffle() {
+  let arr;
+  do {
+    arr = tiles.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  } while (!isSolvable(arr) || isSolved(arr));
+
+  tiles = arr;
+  render();
+}
+
+/* -------------------------------------
+   REPRESENTACIÓN VISUAL
+------------------------------------- */
+function render() {
+  for (let pos = 0; pos < tiles.length; pos++) {
+    const value = tiles[pos];
+    const el = tileEls.get(pos);
+
+    if (value === 0) {
+      el.classList.add("empty");
+      el.style.backgroundImage = "";
+    } else {
+      el.classList.remove("empty");
+      el.style.backgroundImage = `url(${backgroundImageURL})`;
+
+      const tileIndex = value - 1;
+      const srcRow = Math.floor(tileIndex / COLS);
+      const srcCol = tileIndex % COLS;
+
+      const xPct = (srcCol / (COLS - 1)) * 100;
+      const yPct = (srcRow / (ROWS - 1)) * 100;
+
+      el.style.backgroundPosition = `${xPct}% ${yPct}%`;
+      el.style.backgroundSize = `${COLS * 100}% ${ROWS * 100}%`;
+    }
+  }
+}
+
+/* -------------------------------------
+   MOVIMIENTO DE FICHAS
+------------------------------------- */
+function moveTile(pos) {
+  const empty = tiles.indexOf(0);
+  if (!isAdjacent(pos, empty)) return;
+
+  [tiles[pos], tiles[empty]] = [tiles[empty], tiles[pos]];
+
+  render();
+  checkWin();
+}
+
+function coords(i) {
+  return { r: Math.floor(i / COLS), c: i % COLS };
+}
+
+function isAdjacent(a, b) {
+  const A = coords(a), B = coords(b);
+  return (Math.abs(A.r - B.r) + Math.abs(A.c - B.c)) === 1;
+}
+
+/* -------------------------------------
+   COMPROBAR VICTORIA
+------------------------------------- */
+function checkWin() {
+  if (isSolved(tiles)) {
+    showCompletedPuzzle();
+  }
+}
+
+function showCompletedPuzzle() {
+  // 1️⃣ Mostrar imagen completa
+  tiles = [];
+  for (let i = 0; i < TOTAL; i++) tiles.push(i + 1);
+
+  for (let pos = 0; pos < TOTAL; pos++) {
+    const el = tileEls.get(pos);
+    el.classList.remove("empty");
+    el.style.backgroundImage = `url(${backgroundImageURL})`;
+
+    const srcRow = Math.floor(pos / COLS);
+    const srcCol = pos % COLS;
+    const xPct = (srcCol / (COLS - 1)) * 100;
+    const yPct = (srcRow / (ROWS - 1)) * 100;
+
+    el.style.backgroundPosition = `${xPct}% ${yPct}%`;
+    el.style.backgroundSize = `${COLS * 100}% ${ROWS * 100}%`;
+  }
+
+  // 2️⃣ Fade out del puzzle
+  gridEl.classList.add("fade-out");
+
+  // 3️⃣ Texto máquina de escribir
+  const msg = document.getElementById("finalMessage");
+  const text = "No te impacientes, Paco. ¡En tu cajón está el regalo!";
+  msg.textContent = "";
+  msg.classList.add("show");
+
+  let index = 0;
+  const speed = 50;
+
+  function typeWriter() {
+    if (index < text.length) {
+      msg.textContent += text.charAt(index);
+      index++;
+      setTimeout(typeWriter, speed);
+    }
+  }
+
+  setTimeout(typeWriter, 500);
+}
+
+/* -------------------------------------
+   LÓGICA DE RESOLUCIÓN
+------------------------------------- */
+function isSolved(arr) {
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] !== i + 1) return false;
+  }
+  return arr[arr.length - 1] === 0;
+}
+
+function countInversions(arr) {
+  let inv = 0;
+  for (let i = 0; i < arr.length; i++)
+    for (let j = i + 1; j < arr.length; j++)
+      if (arr[i] && arr[j] && arr[i] > arr[j]) inv++;
+  return inv;
+}
+
+function isSolvable(arr) {
+  return countInversions(arr) % 2 === 0;
+}
+
+/* -------------------------------------
+   INICIAR
+------------------------------------- */
+initBoard();
+</script>
+
+</body>
+</html>
